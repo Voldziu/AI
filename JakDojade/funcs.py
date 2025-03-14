@@ -9,25 +9,27 @@ from collections import defaultdict
 class Node:
     def __init__(self, station_name, g=float('inf'), h=0, parent=None, edge=None,arrival_time=None):
         self.station_name = station_name  # name of the station
-        self.g = g  # cost so far: absolute arrival time at this station
+        self.g = g  # cost so far. Travels or time respectively. In time mode, it's the arrival time. In travels mode it's end cost.
         self.h = h  # heuristic: estimated remaining travel time
         self.f = g + h  # total estimated cost
         self.parent = parent  # pointer to predecessor Node
         self.edge = edge  # the edge (trip) taken to reach this node; tuple: (line, dep_time, arr_time, from_station, to_station)
         self.arrival_time = arrival_time if arrival_time is not None else g
+        self.current_line = None
 
     def __lt__(self, other):
         # This is needed for the heapq to compare nodes.
         return self.g < other.g
     def __repr__(self):
         return f"Node({self.station_name}, g={self.g}, h={self.h}, f={self.f})"
-def parse_time(tstr):
-    """
-     Converts hh:mm:ss time to "seconds after midnight"
-    """
-    hh, mm, ss = map(int, tstr.split(':'))
-    return hh * 3600 + mm * 60 + ss
 
+
+
+def parse_time(tstr):
+    hh, mm, ss = map(int, tstr.split(':'))
+    # if(hh>=24):
+    #     hh = hh-24
+    return hh * 3600 + mm * 60 + ss
 
 def format_time(seconds):
     """
@@ -65,7 +67,7 @@ def heuristic(start, station_coords, end):
     return distance / V_AVG
 
 
-def build_adjacency(csv_filename):
+def build_adjacency(df):
     """
     Reads CSV data
     builds adjacency dict = adjacency[start_stop] = list (dep_time, arr_time, line, end_stop)
@@ -74,23 +76,22 @@ def build_adjacency(csv_filename):
     adjacency = defaultdict(list)
     stop_coords = {}  # Mapping stop -> (latitude, longitude)
 
-    with open(csv_filename, mode='r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
 
-            line_name   = row['line']
-            dep_time    = parse_time(row['departure_time'])
-            arr_time    = parse_time(row['arrival_time'])
-            start_stop  = row['start_stop']
-            end_stop    = row['end_stop']
+    for id,row in df.iterrows():
 
-            # Save coordinates if not already present
-            if start_stop not in stop_coords:
-                stop_coords[start_stop] = (float(row['start_stop_lat']), float(row['start_stop_lon']))
-            if end_stop not in stop_coords:
-                stop_coords[end_stop] = (float(row['end_stop_lat']), float(row['end_stop_lon']))
+        line_name   = row['line']
+        dep_time    = row['departure_time']
+        arr_time    = row['arrival_time']
+        start_stop  = row['start_stop']
+        end_stop    = row['end_stop']
 
-            adjacency[start_stop].append((dep_time, arr_time, line_name, end_stop))
+        # Save coordinates if not already present
+        if start_stop not in stop_coords:
+            stop_coords[start_stop] = (float(row['start_stop_lat']), float(row['start_stop_lon']))
+        if end_stop not in stop_coords:
+            stop_coords[end_stop] = (float(row['end_stop_lat']), float(row['end_stop_lon']))
+
+        adjacency[start_stop].append((dep_time, arr_time, line_name, end_stop))
 
     # Posortuj listy wg dep_time
     for st in adjacency:
@@ -98,121 +99,48 @@ def build_adjacency(csv_filename):
 
     return adjacency,stop_coords
 
-def get_neighbors(node, adjacency,mode):
+def get_neighbors(current, adjacency, transfer_penalty,min_wait=120):
     """
-    Main function, it has 2 modes. Cost is computed differently.
-    """
-    if mode=="TIME":
-        return get_neighbors_time(node,adjacency)
-    elif mode =="TRANSFERS":
-        return get_neighbors_transfers(node,adjacency)
-    else:
-        raise ValueError("Unknown mode: choose 'time' or 'transfers'")
-
-def get_neighbors_time(current, adjacency):
-    """
-    For "time" mode: For current Node, returns list of neighbors.
-    Each neighbor is a tuple:
+    Returns neighbor information for the current node.
+    For each trip (dep_time, arr_time, candidate_line, next_station) from current.station_name:
+      - If current.current_line is None or equals candidate_line:
+           Trip is catchable if dep_time >= current.arrival_time.
+           new_cost = candidate arrival time; new_arrival = candidate arrival time.
+      - Else (transferring):
+           Trip is catchable only if dep_time >= current.arrival_time + 120 (2 minutes wait).
+           new_cost = candidate arrival time + transfer_penalty;
+           new_arrival = candidate arrival time + transfer_penalty.
+    Returns a list of tuples:
        (neighbor_station, new_cost, new_arrival, edge_info)
-    where new_cost = arrival time (arr_time) of the trip,
-          edge_info = (line, dep_time, arr_time, from_station, to_station).
-    Only trips that depart at or after current.arrival_time are catchable.
+    where edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station).
     """
     neighbors = []
-    if current.station_name not in adjacency:
-        return neighbors
-    for (dep_time, arr_time, line, next_station) in adjacency[current.station_name]:
-        if dep_time >= current.arrival_time:
-            new_cost = arr_time  # arrival time becomes cost
-            edge_info = (line, dep_time, arr_time, current.station_name, next_station)
-            neighbors.append((next_station, new_cost, arr_time, edge_info))
-    return neighbors
 
-def get_neighbors_transfers(current, adjacency):
-    """
-    For "transfers" mode: For current Node, returns list of neighbors.
-    Each neighbor is a tuple:
-       (neighbor_station, new_cost, new_arrival, edge_info)
-    Here, new_cost is computed as:
-      current.g + (0 if continuing on same line, else 1)
-    For the start node (with no edge yet), no transfer cost is added.
-    """
-    neighbors = []
     if current.station_name not in adjacency:
         return neighbors
-    # Determine current line (if any) from the edge used to reach current.
-    current_line = current.edge[0] if current.edge is not None else None
-    for (dep_time, arr_time, line, next_station) in adjacency[current.station_name]:
-        if dep_time >= current.arrival_time:
-            transfer_inc = 0 if (current_line is None or current_line == line) else 1
-            new_cost = current.g + transfer_inc
-            edge_info = (line, dep_time, arr_time, current.station_name, next_station)
-            neighbors.append((next_station, new_cost, arr_time, edge_info))
+    for (dep_time, arr_time, candidate_line, next_station) in adjacency[current.station_name]:
+        if current.current_line is None or current.current_line == candidate_line:
+            # Same line or first ride
+            if dep_time >= current.arrival_time:
+                new_cost = arr_time
+                new_arrival = arr_time
+                edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station)
+                neighbors.append((next_station, new_cost, new_arrival, edge_info))
+        else:
+            # Transfer: require at least 2 minutes wait
+            if dep_time >= current.arrival_time + min_wait:
+                new_cost = current.g + transfer_penalty
+                new_arrival = arr_time
+                edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station)
+                neighbors.append((next_station, new_cost, new_arrival, edge_info))
     return neighbors
 
 
 
 
-def dijkstra_min_time(adjacency, start_station, end_station, start_time):
-    """
-    Dijkstra algorithm implementation
-      - adjacency: dict with list (dep_time, arr_time, line, next_stop)
-      - start_station: start station (A)
-      - end_station: end station (B)
-      - start_time: arrival time on start station (in seconds after midnight)
 
-    Zwraca:
-      - dist: dict with minimal time to arrive to every station
-      - parent: dict to retrieve path: parent[station] = (prev_station, line, dep_time, arr_time)
-    """
 
-    # dist[p] = minimal arrival time to station p
-    dist = defaultdict(lambda: float('inf'))
-    dist[start_station] = start_time
 
-    # parent[p] = (preq_station, line, dep_time, arr_time)
-    parent = dict()
-
-    # Prio queue (min-heap) holds tuples (curr_time, station)
-    pq = []
-    heapq.heappush(pq, (start_time, start_station)) # initilization
-
-    while pq:
-        curr_time, station = heapq.heappop(pq)
-
-        # if its worse than in dist, skip
-        if curr_time > dist[station]:
-            continue
-
-        # end station arrival, end and return
-        if station == end_station:
-            break
-
-        # List of every course possible form given station (time seperate)
-        edges = adjacency.get(station, [])
-        if not edges:
-            continue
-
-        #  dep_times for each edge outcoming from each station
-        dep_times = [edge[0] for edge in edges]
-
-        # Binary search index for earliest valid course.
-        idx = bisect_left(dep_times, curr_time)
-
-        # Starting from idx index to end of edges list
-        for i in range(idx, len(edges)):
-            dep_time, arr_time, line_name, next_station = edges[i]
-
-            # dep_time >= curr_time -> czekamy do dep_time
-            # przyjazd = arr_time
-            arrival = arr_time
-            # Here it checks if new connection is better than the old one, Dijsktra core.
-            if arrival < dist[next_station]:
-                dist[next_station] = arrival
-                parent[next_station] = (station, line_name, dep_time, arr_time)
-                heapq.heappush(pq, (arrival, next_station))
-
-    return dist, parent
 
 
 

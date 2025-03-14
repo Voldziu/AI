@@ -1,4 +1,5 @@
 from funcs import *
+from DataPreprocessing import *
 from AStar import a_star
 from Dijkstra import dijkstra
 
@@ -6,16 +7,17 @@ csv_file_name = "connection_graph.csv"
 
 
 if __name__ == "__main__":
-    adjacency,station_coords = build_adjacency(csv_file_name)
+    with open("graph.pickle", "rb") as f:
+        adjacency, station_coords = pickle.load(f)
     START_STATION = "Stalowa"
-    END_STATION = "Psie Pole (Rondo Lotników Polskich)"
+    END_STATION = "most Grunwaldzki"
     START_TIME_STR = "20:00:00"
     START_TIME = parse_time(START_TIME_STR)
 
 
 
-    end_node = dijkstra(adjacency,START_STATION,END_STATION,START_TIME)
-    #end_node = a_star(adjacency,START_STATION,END_STATION,START_TIME,station_coords,mode="TIME")
+    #end_node = dijkstra(adjacency,START_STATION,END_STATION,START_TIME)
+    end_node = a_star(adjacency,START_STATION,END_STATION,START_TIME,station_coords,mode="TRANSFERS")
 
     if end_node is None:
         print("There's no connection between those stations.")

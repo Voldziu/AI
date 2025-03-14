@@ -1,41 +1,37 @@
 from funcs import *
 
 
-
-
-
-
-# ----- Main a_star Function that Chooses the Mode -----
-def a_star(adjacency,start_station, end_station,start_time,station_coords, mode="TIME"):
+# ------------------- Unified A* Algorithm -------------------
+def a_star(adjacency, start_station, end_station, start_time, station_coords, mode="TIME"):
     """
-    A* search for a route from start_station to end_station.
+    Unified A* search for a route from start_station to end_station.
 
     Parameters:
-      - mode: "time" minimizes travel time (seconds), "transfers" minimizes the number of transfers.
-
-    Returns the end Node (with final arrival time and parent pointers).
+      - mode: "TIME" minimizes travel time (in seconds) with a transfer penalty of 2 minutes;
+              "TRANSFERS" minimizes transfers by adding a penalty of 30 minutes (1800 s) for transfers.
+    Returns the end Node (with final arrival time and parent pointers) so that the path can be reconstructed.
     """
+    mode = mode.upper()
     if mode == "TIME":
-        return a_star_time(start_station, end_station, adjacency, station_coords, start_time)
+        transfer_penalty = 0  # 2 minutes penalty for transferring
+
     elif mode == "TRANSFERS":
-        return a_star_transfers(start_station, end_station, adjacency, station_coords, start_time)
+        transfer_penalty = 1800  # 30 minutes penalty for transferring
+
     else:
-        raise ValueError("Unknown mode: choose 'time' or 'transfers'")
+        raise ValueError("Unknown mode: choose 'TIME' or 'TRANSFERS'")
 
+    heuristic_fn = lambda s: heuristic(s, station_coords, end_station)
 
-# ----- A* algorithm  -----
-def a_star_time(start_station, end_station, adjacency, station_coords, start_time):
-    """
-    A* search for fastest route (minimal travel time).
-    The cost is measured in seconds (arrival time).
-    """
-    start_node = Node(start_station,g=start_time, arrival_time=start_time, parent=None, edge=None)
-    start_node.f = start_node.g + heuristic(start_station, station_coords, end_station)
+    # Initialize start node.
+    start_node = Node(start_station, g=start_time, arrival_time=start_time, parent=None, edge=None)
+    start_node.current_line = None
+    start_node.h = heuristic_fn(start_station)
+    start_node.f = start_node.g + start_node.h
     open_list = [start_node]
     closed_list = []
 
     while open_list:
-        # Select node with lowest f
         current = min(open_list, key=lambda node: node.f)
         if current.station_name == end_station:
             return current  # Goal reached
@@ -43,15 +39,21 @@ def a_star_time(start_station, end_station, adjacency, station_coords, start_tim
         open_list.remove(current)
         closed_list.append(current)
 
-        for (nbr_stop, new_cost, new_arrival, edge_info) in get_neighbors(current, adjacency,mode="TIME"):
+        for (nbr, new_cost, new_arrival, edge_info) in get_neighbors(current, adjacency, transfer_penalty):
             tentative_cost = new_cost
-            # Check if neighbor exists in open or closed (by station name)
-            neighbor_in_open = next((n for n in open_list if n.station_name == nbr_stop), None)
-            neighbor_in_closed = next((n for n in closed_list if n.station_name == nbr_stop), None)
+            neighbor_in_open = next((n for n in open_list if n.station_name == nbr), None)
+            neighbor_in_closed = next((n for n in closed_list if n.station_name == nbr), None)
 
             if neighbor_in_open is None and neighbor_in_closed is None:
-                neighbor = Node(nbr_stop, g=tentative_cost, arrival_time=new_arrival, parent=current, edge=edge_info)
-                neighbor.f = neighbor.g + heuristic(nbr_stop, station_coords, end_station)
+                neighbor = Node(nbr, g=tentative_cost, arrival_time=new_arrival, parent=current, edge=edge_info)
+                # Set current_line: if current.current_line is None, assign candidate line; else propagate if same, else update.
+                if current.current_line is None:
+                    neighbor.current_line = edge_info[0]
+                else:
+                    neighbor.current_line = current.current_line if current.current_line == edge_info[0] else edge_info[
+                        0]
+                neighbor.h = heuristic_fn(nbr)
+                neighbor.f = neighbor.g + neighbor.h
                 open_list.append(neighbor)
             else:
                 existing = neighbor_in_open if neighbor_in_open is not None else neighbor_in_closed
@@ -60,74 +62,11 @@ def a_star_time(start_station, end_station, adjacency, station_coords, start_tim
                     existing.arrival_time = new_arrival
                     existing.parent = current
                     existing.edge = edge_info
-                    existing.f = existing.g + heuristic(nbr_stop, station_coords, end_station)
+                    existing.h = heuristic_fn(nbr)
+                    existing.f = existing.g + existing.h
                     if neighbor_in_closed is not None:
                         closed_list.remove(existing)
                         open_list.append(existing)
     return None
-
-
-# ----- A* for "transfers" mode -----
-def a_star_transfers(start_station, end_station, adjacency, station_coords, start_time):
-    """
-    A* search for a route minimizing the number of transfers.
-    The cost (g) is the number of transfers (an integer), and we track actual arrival times.
-    The heuristic is 0 (i.e. uniform-cost search in terms of transfers).
-
-    Returns the goal Node (which contains the final arrival time and parent pointer)
-    so that the path can be reconstructed.
-    """
-    # Start with 0 transfers; arrival_time is start_time.
-    start_node = Node(start_station, g=0, h=0, parent=None, edge=None, arrival_time=start_time)
-    start_node.current_line = None  # No line chosen yet.
-    start_node.f = start_node.g  # heuristic = 0
-    open_list = [start_node]
-    closed_list = []
-
-    while open_list:
-        current = min(open_list, key=lambda node: node.f)
-        if current.station_name == end_station:
-            return current  # Goal reached
-
-        open_list.remove(current)
-        closed_list.append(current)
-
-        for (nbr_stop, new_cost, new_arrival, edge_info) in get_neighbors(current, adjacency, mode="TRANSFERS"):
-            new_line = edge_info[0]
-            tentative_cost = new_cost  # new_cost already includes transfer count
-
-            # Check if a neighbor with the same station and same current line exists.
-            neighbor_in_open = next((n for n in open_list
-                                     if n.station_name == nbr_stop and getattr(n, "current_line", None) == new_line),
-                                    None)
-            neighbor_in_closed = next((n for n in closed_list
-                                       if n.station_name == nbr_stop and getattr(n, "current_line", None) == new_line),
-                                      None)
-
-            if neighbor_in_open is None and neighbor_in_closed is None:
-                neighbor = Node(nbr_stop, g=tentative_cost, h=0, parent=current, edge=edge_info,
-                                arrival_time=new_arrival)
-                neighbor.current_line = new_line
-                neighbor.f = neighbor.g  # heuristic = 0
-                open_list.append(neighbor)
-            else:
-                existing = neighbor_in_open if neighbor_in_open is not None else neighbor_in_closed
-                # Update if a route with a lower transfer count is found,
-                # or if transfer count is equal and arrival is earlier.
-                if tentative_cost < existing.g or (
-                        tentative_cost == existing.g and new_arrival < existing.arrival_time):
-                    existing.g = tentative_cost
-                    existing.arrival_time = new_arrival
-                    existing.parent = current
-                    existing.edge = edge_info
-                    existing.current_line = new_line
-                    existing.f = existing.g  # heuristic = 0
-                    if neighbor_in_closed is not None:
-                        closed_list.remove(existing)
-                        open_list.append(existing)
-    return None
-
-
-
 
 
