@@ -1,3 +1,5 @@
+import math
+
 from funcs import *
 
 
@@ -13,7 +15,7 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords, mo
     """
     mode = mode.upper()
     if mode == "TIME":
-        transfer_penalty = 0  # 2 minutes penalty for transferring
+        transfer_penalty = 0  # 0 minutes penalty for transferring
 
     elif mode == "TRANSFERS":
         transfer_penalty = 1800  # 30 minutes penalty for transferring
@@ -24,10 +26,10 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords, mo
     heuristic_fn = lambda s: heuristic(s, station_coords, end_station)
 
     # Initialize start node.
-    start_node = Node(start_station, g=start_time, arrival_time=start_time, parent=None, edge=None)
+    start_node = Node(start_station, g=0,total=0, arrival_time=start_time, parent=None, edge=None)
     start_node.current_line = None
     start_node.h = heuristic_fn(start_station)
-    start_node.f = start_node.g + start_node.h
+    start_node.f = start_node.total + start_node.h
     open_list = [start_node]
     closed_list = []
 
@@ -38,32 +40,45 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords, mo
 
         open_list.remove(current)
         closed_list.append(current)
+        print(current)
+        # print(closed_list)
+        # print(len(open_list))
+        neighbors = get_neighbors(current, adjacency, transfer_penalty)
+        for (nbr, edge_cost, new_total, new_arrival, edge_info)  in neighbors:
+            #print(nbr, edge_cost, new_total, new_arrival, edge_info)
+            tentative_total = new_total
 
-        for (nbr, new_cost, new_arrival, edge_info) in get_neighbors(current, adjacency, transfer_penalty):
-            tentative_cost = new_cost
-            neighbor_in_open = next((n for n in open_list if n.station_name == nbr), None)
-            neighbor_in_closed = next((n for n in closed_list if n.station_name == nbr), None)
+            candidate_line = edge_info[0]
+            neighbor_in_open = next(
+                (n for n in open_list if n.station_name == nbr and n.current_line == candidate_line), None)
+            neighbor_in_closed = next(
+                (n for n in closed_list if n.station_name == nbr and n.current_line == candidate_line), None)
 
             if neighbor_in_open is None and neighbor_in_closed is None:
-                neighbor = Node(nbr, g=tentative_cost, arrival_time=new_arrival, parent=current, edge=edge_info)
-                # Set current_line: if current.current_line is None, assign candidate line; else propagate if same, else update.
+                neighbor = Node(nbr, g=edge_cost, total=tentative_total, h=heuristic_fn(nbr), parent=current,
+                                edge=edge_info, arrival_time=new_arrival)
+
                 if current.current_line is None:
                     neighbor.current_line = edge_info[0]
                 else:
                     neighbor.current_line = current.current_line if current.current_line == edge_info[0] else edge_info[
                         0]
-                neighbor.h = heuristic_fn(nbr)
-                neighbor.f = neighbor.g + neighbor.h
+
+                neighbor.f = neighbor.total + neighbor.h
                 open_list.append(neighbor)
             else:
                 existing = neighbor_in_open if neighbor_in_open is not None else neighbor_in_closed
-                if tentative_cost < existing.g:
-                    existing.g = tentative_cost
+                tentative_f = tentative_total + heuristic_fn(nbr)
+
+                if tentative_f < existing.total+existing.h:
+                    print(existing)
+                    existing.g = edge_cost
+                    existing.total= tentative_total
                     existing.arrival_time = new_arrival
                     existing.parent = current
                     existing.edge = edge_info
                     existing.h = heuristic_fn(nbr)
-                    existing.f = existing.g + existing.h
+                    existing.f = existing.total + existing.h
                     if neighbor_in_closed is not None:
                         closed_list.remove(existing)
                         open_list.append(existing)

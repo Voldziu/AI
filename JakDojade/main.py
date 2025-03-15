@@ -35,11 +35,13 @@ if __name__ == "__main__":
     grouped_path = group_segments(path)
 
     print(f"\t\t=== Route from {START_STATION} to {END_STATION}  ===\n")
-    print_grouped_schedule(grouped_path)
+    print(f"Start time: {START_TIME_STR}")
+    print_grouped_schedule(START_TIME,grouped_path)
 
     # Print total travel time
     total_travel_time = end_node.arrival_time - START_TIME
     print("\n=== Final cost ===", file=sys.stderr)
+    print(f"\n=== {end_node.total} ===", file=sys.stderr)
     print(
         f"Final travel time: {total_travel_time} s "
         f"(~{total_travel_time / 60:.1f} min)",

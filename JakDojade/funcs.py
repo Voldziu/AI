@@ -7,21 +7,23 @@ from collections import defaultdict
 
 
 class Node:
-    def __init__(self, station_name, g=float('inf'), h=0, parent=None, edge=None,arrival_time=None):
+    def __init__(self, station_name, g=float('inf'), total=0,h=0, parent=None, edge=None,arrival_time=None):
         self.station_name = station_name  # name of the station
-        self.g = g  # cost so far. Travels or time respectively. In time mode, it's the arrival time. In travels mode it's end cost.
+        self.g = g  # edge cost
+        self.total = total # cost so far (adding f's)
         self.h = h  # heuristic: estimated remaining travel time
-        self.f = g + h  # total estimated cost
+        self.f = total + h  # total estimated cost
+
         self.parent = parent  # pointer to predecessor Node
         self.edge = edge  # the edge (trip) taken to reach this node; tuple: (line, dep_time, arr_time, from_station, to_station)
-        self.arrival_time = arrival_time if arrival_time is not None else g
+        self.arrival_time = arrival_time
         self.current_line = None
 
     def __lt__(self, other):
         # This is needed for the heapq to compare nodes.
         return self.g < other.g
     def __repr__(self):
-        return f"Node({self.station_name}, g={self.g}, h={self.h}, f={self.f})"
+        return f"Node({self.station_name}, g={self.g}, total={self.total}, h={self.h}, f={self.f}, current_line= {self.current_line})"
 
 
 
@@ -52,7 +54,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 # Maximum bus speed in km/h (for heuristic) converted to km/s.
-V_AVG = 40 / 3600.0  # ~0.01389 km/s #Average bus/tram speed (ASSUMPTION)
+V_AVG = 20 / 3600.0  # ~0.01389 km/s #Average bus/tram speed (ASSUMPTION) (in straight line)
 
 def heuristic(start, station_coords, end):
     """
@@ -64,7 +66,7 @@ def heuristic(start, station_coords, end):
     lat1, lon1 = station_coords[start]
     lat2, lon2 = station_coords[end]
     distance = haversine(lat1, lon1, lat2, lon2)
-    return distance / V_AVG
+    return 1* distance / V_AVG
 
 
 def build_adjacency(df):
@@ -101,17 +103,19 @@ def build_adjacency(df):
 
 def get_neighbors(current, adjacency, transfer_penalty,min_wait=120):
     """
-    Returns neighbor information for the current node.
     For each trip (dep_time, arr_time, candidate_line, next_station) from current.station_name:
-      - If current.current_line is None or equals candidate_line:
-           Trip is catchable if dep_time >= current.arrival_time.
-           new_cost = candidate arrival time; new_arrival = candidate arrival time.
-      - Else (transferring):
-           Trip is catchable only if dep_time >= current.arrival_time + 120 (2 minutes wait).
-           new_cost = candidate arrival time + transfer_penalty;
-           new_arrival = candidate arrival time + transfer_penalty.
+      - If current.current_line is None or equals candidate_line (i.e. no transfer):
+            Trip is catchable if candidate.dep_time >= current.arrival_time.
+            edge_cost = (candidate.arr_time - candidate.dep_time).
+            .
+            new_arrival = candidate.arr_time.
+      - Else (transfer):
+            Trip is catchable only if candidate.dep_time >= current.arrival_time + min_wait.
+            edge_cost = (candidate.arr_time - candidate.dep_time) + penalty.
+
+            new_arrival = candidate.arr_time.
     Returns a list of tuples:
-       (neighbor_station, new_cost, new_arrival, edge_info)
+      (neighbor_station, edge_cost, new_total, new_arrival, edge_info)
     where edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station).
     """
     neighbors = []
@@ -122,17 +126,19 @@ def get_neighbors(current, adjacency, transfer_penalty,min_wait=120):
         if current.current_line is None or current.current_line == candidate_line:
             # Same line or first ride
             if dep_time >= current.arrival_time:
-                new_cost = arr_time
+                edge_cost = arr_time - current.arrival_time
+                new_total = current.total + edge_cost
                 new_arrival = arr_time
                 edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station)
-                neighbors.append((next_station, new_cost, new_arrival, edge_info))
+                neighbors.append((next_station, edge_cost,new_total, new_arrival, edge_info))
         else:
             # Transfer: require at least 2 minutes wait
             if dep_time >= current.arrival_time + min_wait:
-                new_cost = current.g + transfer_penalty
+                edge_cost = arr_time - current.arrival_time + transfer_penalty
+                new_total = current.total + edge_cost
                 new_arrival = arr_time
                 edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station)
-                neighbors.append((next_station, new_cost, new_arrival, edge_info))
+                neighbors.append((next_station, edge_cost,new_total, new_arrival, edge_info))
     return neighbors
 
 
@@ -215,13 +221,22 @@ def group_segments(path):
 
 
 
-def print_grouped_schedule(groups):
+def print_grouped_schedule(start_time,groups):
     """
     Prints each grouped segment (same line), including:
       - total ride time for that line segment
       - transfer time before the next line
     """
-    for i, group in enumerate(groups):
+    start_index = 0
+    first_group = groups[start_index]
+    line, dep_time, arr_time, st_start, st_end = first_group
+    if(start_time<dep_time):
+        waiting_time = dep_time-start_time
+        print(
+            f"  Waiting time to catch first line: "
+            f"{waiting_time} s ({waiting_time / 60:.1f} min)"
+        )
+    for i, group in enumerate(groups[start_index:]):
         line, dep_time,  arr_time,st_start, st_end = group
         group_ride_time = arr_time - dep_time
         print(
@@ -236,7 +251,7 @@ def print_grouped_schedule(groups):
             transfer_time = next_dep_time - arr_time
             print(
                 f"  Transfer time before catching line {next_line}: "
-                f"{transfer_time} s (~{transfer_time/60:.1f} min)"
+                f"{transfer_time} s ({transfer_time/60:.1f} min)"
             )
 
 
