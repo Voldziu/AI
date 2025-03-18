@@ -2,6 +2,7 @@ import csv
 import heapq
 import sys
 import math
+import random
 from bisect import bisect_left
 from collections import defaultdict
 
@@ -253,5 +254,57 @@ def print_grouped_schedule(start_time,groups):
                 f"  Transfer time before catching line {next_line}: "
                 f"{transfer_time} s ({transfer_time/60:.1f} min)"
             )
+
+
+
+
+def prepare_n_stations_for_search(adjacency,n):
+    station_names = list(adjacency.keys())
+    return_string =""
+    if(n<3):
+        return return_string
+    chosen_stations =  random.sample(station_names,n)
+
+    for name in chosen_stations[1:-1]:
+        return_string+=(name+";")
+    return_string+=chosen_stations[-1]
+
+    return chosen_stations[0],return_string
+
+
+
+
+def print_whole_stats(end_node,start_station,end_station,start_time):
+    start_time_str = format_time(start_time)
+
+
+    if end_node is None:
+        print("There's no connection between those stations.")
+        sys.exit(1)
+
+    path = reconstruct_path(end_node)
+    if not path:
+        print("No connection (parent invalid)")
+        sys.exit(1)
+
+    # Group consecutive segments by line
+    grouped_path = group_segments(path)
+
+    print(f"\t\t=== Route from {start_station} to {end_station}  ===\n")
+    print(f"Start time: {start_time_str}")
+    print_grouped_schedule(start_time, grouped_path)
+
+    # Print total travel time
+    total_travel_time = end_node.arrival_time - start_time
+    print("\n=== Final cost ===", file=sys.stderr)
+    print(f"\n=== {end_node.total} ===", file=sys.stderr)
+    print(
+        f"Final travel time: {total_travel_time} s "
+        f"(~{total_travel_time / 60:.1f} min)",
+        file=sys.stderr
+    )
+
+
+
 
 
