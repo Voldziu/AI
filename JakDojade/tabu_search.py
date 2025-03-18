@@ -111,9 +111,9 @@ def tabu_search(start_station,stations_string,start_time,mode="TIME"):
     best_solution, best_cost = tabu_search_alg(
         init_solution=init_solution,
         cost_fn=cost_fn,
-        step_limit=20,
-        op_limit= 10,
-        tabu_size=5,
+        step_limit=50,
+        op_limit= 30,
+        tabu_size=10,
         epsilon=0.1,
         min_wait=120
 
@@ -207,7 +207,7 @@ if __name__=="__main__":
 
     start_station = "Stalowa"
     #stations_string = "most Grunwaldzki;Kochanowskiego;Wiśniowa;PL. JANA PAWŁA II"
-    stations_string = "most Grunwaldzki;Kochanowskiego;PL. JANA PAWŁA II"
+    stations_string = "GRABISZYŃSKA (Cmentarz);ZOO;Urząd Wojewódzki (Muzeum Narodowe)"
 
 
     best_solution, best_cost,route_cache = tabu_search(start_station,stations_string,START_TIME)
