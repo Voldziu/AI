@@ -140,9 +140,6 @@ def costAStar(route_cache,adjacency,start_time,start_station,station_names,stati
         connection_cost,arrival = a_star_cost_arrival(route_cache,adjacency,start_station=station_names[i],end_station=station_names[i+1],start_time=next_route_start_time,station_coords=station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait)
         next_route_start_time = arrival + min_wait
         cost+=connection_cost
-
-    connection_cost,arrival = a_star_cost_arrival(route_cache,adjacency,start_station=station_names[-2],end_station=station_names[-1],start_time=next_route_start_time,station_coords=station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait)
-    next_route_start_time = arrival + min_wait
     cost +=connection_cost
     connection_cost,arrival = a_star_cost_arrival(route_cache, adjacency, start_station=station_names[-1],
                                   end_station=start_station, start_time=next_route_start_time, station_coords=station_coords
