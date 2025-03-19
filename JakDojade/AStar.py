@@ -33,16 +33,15 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
 
     heuristic_fn = lambda s: heuristic(s, station_coords, end_station)
 
+
     # Initialize start node.
     if start_node is None:
         start_node = Node(start_station, g=0,total=0, arrival_time=start_time, parent=None, edge=None,current_line=None)
     else:
-        #Clean previous end_node
-        #print(start_node)
-        start_node.g=0
-        start_node.total=0
-        start_node.f=0
-        start_node.parent=None # parent is still important to determine the direction of the line.
+        new_start_node = Node(start_station,g=0,total=0,arrival_time=start_node.arrival_time,parent=None,edge=None,current_line=start_node.current_line)
+        new_start_node.parent_station_name = start_node.parent.station_name
+
+        start_node = new_start_node
 
     start_node.h = heuristic_fn(start_station)
     start_node.f = start_node.total + start_node.h
@@ -69,10 +68,14 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
 
             candidate_line = edge_info[0]
             parent_station_name = edge_info[3]
+
+
             neighbor_in_open = next(
-                (n for n in open_list if n.station_name == nbr and n.current_line == candidate_line and n.parent and n.parent.station_name  == parent_station_name), None)
+                (n for n in open_list if n.station_name == nbr and n.current_line == candidate_line and n.parent_station_name  == parent_station_name), None)
             neighbor_in_closed = next(
-                (n for n in closed_list if n.station_name == nbr and n.current_line == candidate_line and n.parent and n.parent.station_name  == parent_station_name), None)
+                (n for n in closed_list if n.station_name == nbr and n.current_line == candidate_line  and n.parent_station_name  == parent_station_name), None)
+
+
 
             if neighbor_in_open is None and neighbor_in_closed is None:
                 neighbor = Node(nbr, g=edge_cost, total=tentative_total, h=heuristic_fn(nbr), parent=current,

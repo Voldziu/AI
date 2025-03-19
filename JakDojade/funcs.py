@@ -16,6 +16,7 @@ class Node:
         self.f = total + h  # total estimated cost
 
         self.parent = parent  # pointer to predecessor Node
+        self.parent_station_name =  self.parent.station_name if  self.parent else ""
         self.edge = edge  # the edge (trip) taken to reach this node; tuple: (line, dep_time, arr_time, from_station, to_station)
         self.arrival_time = arrival_time
         self.current_line = current_line
@@ -124,7 +125,10 @@ def get_neighbors(current, adjacency, transfer_penalty,min_wait=120):
     if current.station_name not in adjacency:
         return neighbors
     for (dep_time, arr_time, candidate_line, next_station) in adjacency[current.station_name]:
-        if current.current_line is None or current.current_line == candidate_line:
+        if (current.current_line is None or
+                (current.current_line == candidate_line
+                 and
+                 current.parent_station_name != next_station )): # reversing on the same line, we need a transfer.
             # Same line or first ride
             if dep_time >= current.arrival_time:
                 edge_cost = arr_time - current.arrival_time
@@ -298,13 +302,13 @@ def print_whole_stats(end_node,start_station,end_station,start_time):
 
     # Print total travel time
     total_travel_time = end_node.arrival_time - start_time
-    print("\n=== Final cost ===", file=sys.stderr)
-    print(f"\n=== {end_node.total} ===", file=sys.stderr)
-    print(
-        f"Final travel time: {total_travel_time} s "
-        f"(~{total_travel_time / 60:.1f} min)",
-        file=sys.stderr
-    )
+    # print("\n=== Final cost ===", file=sys.stderr)
+    # print(f"\n=== {end_node.total} ===", file=sys.stderr)
+    # print(
+    #     f"Final travel time: {total_travel_time} s "
+    #     f"(~{total_travel_time / 60:.1f} min)",
+    #     file=sys.stderr
+    # )
 
 
 

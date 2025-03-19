@@ -111,7 +111,7 @@ def tabu_search(start_station,stations_string,start_time,mode="TIME"):
     best_solution, best_cost = tabu_search_alg(
         init_solution=init_solution,
         cost_fn=cost_fn,
-        step_limit=50,
+        step_limit=1000,
         op_limit= 30,
         tabu_size=10,
         epsilon=0.1,
@@ -181,6 +181,7 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
         t = route_order[i + 1]
         key = (s, t, current_time)
         print(f"\nLeg {i + 1}: {s} -> {t}")
+        #print(key)
         if key in route_cache:
             end_node = route_cache[key]
             next_departure_time = end_node.arrival_time
@@ -214,7 +215,8 @@ if __name__=="__main__":
 
     start_station = "Stalowa"
     #stations_string = "most Grunwaldzki;Kochanowskiego;Wiśniowa;PL. JANA PAWŁA II"
-    stations_string = "GRABISZYŃSKA (Cmentarz);ZOO;Urząd Wojewódzki (Muzeum Narodowe)"
+    stations_string = "GRABISZYŃSKA (Cmentarz);ZOO;Urząd Wojewódzki (Muzeum Narodowe);most Grunwaldzki;Kochanowskiego;Wiśniowa;PL. JANA PAWŁA II"
+    #stations_string = "GRABISZYŃSKA (Cmentarz);Fiołkowa;FAT;Hutmen;Bzowa (Centrum Historii Zajezdnia)"
 
 
     best_solution, best_cost,route_cache = tabu_search(start_station,stations_string,START_TIME)
@@ -225,6 +227,7 @@ if __name__=="__main__":
                                 stations_string=stations_string,
                                 solution=best_solution,
                                 start_time=START_TIME,
+
 
 
                               )
