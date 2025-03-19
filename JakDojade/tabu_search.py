@@ -112,8 +112,8 @@ def tabu_search(start_station,stations_string,start_time,mode="TIME"):
         init_solution=init_solution,
         cost_fn=cost_fn,
         step_limit=1000,
-        op_limit= 30,
-        tabu_size=10,
+        op_limit= 50,
+        tabu_size=15,
         epsilon=0.1,
         min_wait=120
 
@@ -161,8 +161,10 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
     """
 
     """
+
     # Decode the solution into route order.
     station_list = stations_string.split(";")
+    keys = route_cache.keys()
     print(station_list)
     print(solution)
     route_order = [start_station]
@@ -176,10 +178,11 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
     # For each leg, retrieve the cached route and print its itinerary.
     current_time = start_time
     total_cost = 0
+    end_node = None
     for i in range(len(route_order) - 1):
         s = route_order[i]
         t = route_order[i + 1]
-        key = (s, t, current_time)
+        key = (s, t, current_time,id(end_node) if end_node is not None else None)
         print(f"\nLeg {i + 1}: {s} -> {t}")
         #print(key)
         if key in route_cache:
