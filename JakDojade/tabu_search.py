@@ -130,20 +130,26 @@ def costAStar(route_cache,adjacency,start_time,start_station,station_names,stati
     cost =0
     num_of_inbetween_stations = len( station_names)
 
-    connection_cost,arrival = a_star_cost_arrival(route_cache,adjacency, start_station=start_station, end_station=station_names[0],
-                                  start_time=start_time, station_coords=station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait)
-    next_route_start_time = arrival +min_wait
+    end_node = a_star_cached_print_stats(route_cache,adjacency, start_station=start_station, end_station=station_names[0],
+                                  start_time=start_time, station_coords=station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=None)
+
+    connection_cost, arrival =end_node.total, end_node.arrival_time
+
     cost += connection_cost
 
     for i in range(num_of_inbetween_stations-1):
         #print(f"Polaczenie: {i}")
-        connection_cost,arrival = a_star_cost_arrival(route_cache,adjacency,start_station=station_names[i],end_station=station_names[i+1],start_time=next_route_start_time,station_coords=station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait)
-        next_route_start_time = arrival + min_wait
+        end_node = a_star_cached_print_stats(route_cache,adjacency,start_station=station_names[i],end_station=station_names[i+1],start_time=arrival,station_coords=station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=end_node)
+        connection_cost, arrival = end_node.total, end_node.arrival_time
         cost+=connection_cost
     cost +=connection_cost
-    connection_cost,arrival = a_star_cost_arrival(route_cache, adjacency, start_station=station_names[-1],
-                                  end_station=start_station, start_time=next_route_start_time, station_coords=station_coords
-                                  ,transfer_penalty=transfer_penalty,min_wait=min_wait)
+    end_node = a_star_cached_print_stats(route_cache, adjacency, start_station=station_names[-1],
+                                  end_station=start_station, start_time=arrival, station_coords=station_coords
+                                  ,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=end_node)
+
+    #print("koniec")
+
+    connection_cost, arrival = end_node.total, end_node.arrival_time
 
     cost += connection_cost
     #print(f"Current cost: {cost}")
@@ -176,7 +182,8 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
         key = (s, t, current_time)
         print(f"\nLeg {i + 1}: {s} -> {t}")
         if key in route_cache:
-            end_node,next_departure_time = route_cache[key]
+            end_node = route_cache[key]
+            next_departure_time = end_node.arrival_time
 
             # Retrieve detailed route:
             itinerary = reconstruct_path(end_node)

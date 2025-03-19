@@ -18,7 +18,7 @@ def a_star_proper(start_station,end_station,start_time,mode="TIME"):
         transfer_penalty = 1800  # 30 minutes penalty for transferring
 
     return a_star(adjacency,start_station,end_station,start_time,station_coords,transfer_penalty,min_wait=120)
-def a_star(adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait):
+def a_star(adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait,start_node=None):
     """
     Unified A* search for a route from start_station to end_station.
 
@@ -34,8 +34,16 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
     heuristic_fn = lambda s: heuristic(s, station_coords, end_station)
 
     # Initialize start node.
-    start_node = Node(start_station, g=0,total=0, arrival_time=start_time, parent=None, edge=None)
-    start_node.current_line = None
+    if start_node is None:
+        start_node = Node(start_station, g=0,total=0, arrival_time=start_time, parent=None, edge=None,current_line=None)
+    else:
+        #Clean previous end_node
+        #print(start_node)
+        start_node.g=0
+        start_node.total=0
+        start_node.f=0
+        start_node.parent=None # parent is still important to determine the direction of the line.
+
     start_node.h = heuristic_fn(start_station)
     start_node.f = start_node.total + start_node.h
     open_list = [start_node]
@@ -60,10 +68,11 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
             tentative_total = new_total
 
             candidate_line = edge_info[0]
+            parent_station_name = edge_info[3]
             neighbor_in_open = next(
-                (n for n in open_list if n.station_name == nbr and n.current_line == candidate_line), None)
+                (n for n in open_list if n.station_name == nbr and n.current_line == candidate_line and n.parent and n.parent.station_name  == parent_station_name), None)
             neighbor_in_closed = next(
-                (n for n in closed_list if n.station_name == nbr and n.current_line == candidate_line), None)
+                (n for n in closed_list if n.station_name == nbr and n.current_line == candidate_line and n.parent and n.parent.station_name  == parent_station_name), None)
 
             if neighbor_in_open is None and neighbor_in_closed is None:
                 neighbor = Node(nbr, g=edge_cost, total=tentative_total, h=heuristic_fn(nbr), parent=current,
@@ -100,27 +109,25 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
 
 
 
-def a_star_cached(route_cache,adjacency, start, end, start_time, station_coords,transfer_penalty,min_wait):
-    key = (start, end, start_time)
+def a_star_cached(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait,start_node=None):
+    key = (start_station, end_station, start_time)
     if key in route_cache:
-        node,_ = route_cache[key]
+        node = route_cache[key]
         return node
-    end_node = a_star(adjacency, start, end, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait)
-    route_cache[key] = (end_node,end_node.arrival_time+min_wait)
+    end_node = a_star(adjacency, start_station, end_station, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=start_node)
+    route_cache[key] = end_node
     return end_node
 
 
 
 
-def a_star_cost_arrival(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait):
-    end_node = a_star_cached(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait)
-
+def a_star_cached_print_stats(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait,start_node=None):
+    end_node = a_star_cached(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=start_node)
+    #print(f"end_node= {end_node}")
     print_whole_stats(end_node,
                       start_station=start_station,
                       end_station=end_station,
                       start_time=start_time,
                       )
-    cost = end_node.total
-    arrival = end_node.arrival_time
-    return cost,arrival
 
+    return end_node

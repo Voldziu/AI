@@ -8,7 +8,7 @@ from collections import defaultdict
 
 
 class Node:
-    def __init__(self, station_name, g=float('inf'), total=0,h=0, parent=None, edge=None,arrival_time=None):
+    def __init__(self, station_name, g=float('inf'), total=0,h=0, parent=None, edge=None,arrival_time=None,current_line=None):
         self.station_name = station_name  # name of the station
         self.g = g  # edge cost
         self.total = total # cost so far (adding f's)
@@ -18,13 +18,13 @@ class Node:
         self.parent = parent  # pointer to predecessor Node
         self.edge = edge  # the edge (trip) taken to reach this node; tuple: (line, dep_time, arr_time, from_station, to_station)
         self.arrival_time = arrival_time
-        self.current_line = None
+        self.current_line = current_line
 
     def __lt__(self, other):
         # This is needed for the heapq to compare nodes.
         return self.g < other.g
     def __repr__(self):
-        return f"Node({self.station_name}, g={self.g}, total={self.total}, h={self.h}, f={self.f}, current_line= {self.current_line})"
+        return f"Node({self.station_name}, g={self.g}, total={self.total},arrival={self.arrival_time}, h={self.h}, f={self.f}, current_line= {self.current_line})"
 
 
 
@@ -160,7 +160,9 @@ def reconstruct_path(end_node):
     """
     path = []
     current = end_node
+    #print(current)
     while current.parent is not None:
+        #print(current)
         path.append(current.edge)
         current = current.parent
     path.reverse()
