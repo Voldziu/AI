@@ -28,7 +28,7 @@ class Node:
     def __eq__(self, other):
         if not isinstance(other, Node):
             return False
-        return self.parent == other.parent and self.arrival_time == other.arrival_time and self.current_line == other.current_line and self.station_name == other.station_name
+        return self.parent_station_name == other.parent_station_name and self.arrival_time == other.arrival_time and self.current_line == other.current_line and self.station_name == other.station_name
     def __repr__(self):
         return f"Node({self.station_name}, g={self.g}, total={self.total},arrival={self.arrival_time}, h={self.h}, f={self.f}, current_line= {self.current_line})"
 
