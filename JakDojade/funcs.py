@@ -140,7 +140,7 @@ def get_neighbors(current, adjacency, transfer_penalty, min_wait=120):
     for (candidate_line, candidate_next_station), departures_list in adjacency[station].items():
 
         # Decide if transferring lines
-        if current.current_line is None or (current.current_line == candidate_line):
+        if current.current_line is None or (current.current_line == candidate_line and current.parent_station_name != candidate_next_station):
             # Same line -> no transfer
             earliest_catch_time = current.arrival_time
             penalty = 0
