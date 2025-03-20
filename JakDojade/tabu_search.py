@@ -4,24 +4,30 @@ from AStar import *
 import pickle
 from funcs import *
 
-def get_neighbors_tabu(solution:[int]):
+import random
+
+
+def get_neighbors_tabu_slice(solution: [int], slice_size: int):
     """
-    Generates the full neighborhood of the given solution using simple swap moves.
-    Returns a list of tuples: (move, neighbor)
-    where move is represented as (i, j) indicating indices that were swapped.
+
     """
     neighbors = []
     n = len(solution)
-    for i in range(n-1):
-        for j in range(i+1, n):
+    for i in range(n - 1):
+        for j in range(i + 1, n):
             neighbor = solution.copy()
             neighbor[i], neighbor[j] = neighbor[j], neighbor[i]
             move = (i, j)
             neighbors.append((move, neighbor))
-    return neighbors
+
+    if slice_size >= len(neighbors):
+        return neighbors
+    else:
+        neighbors= random.sample(neighbors, slice_size)
+        return neighbors
 
 
-def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, epsilon,min_wait=120):
+def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, epsilon):
     """
     Tabu Search for the Traveling Salesman Problem.
 
@@ -35,6 +41,15 @@ def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, eps
       epsilon: aspiration threshold; a tabu move is allowed if the candidate solution’s cost is lower than the current solution’s cost by at least epsilon.
 
     """
+    solution_cache ={}
+    def cache_cost(solution):
+        solution_tuple = tuple(solution)
+        if solution_tuple in solution_cache:
+            return solution_cache[solution_tuple]
+        else:
+            cost = cost_fn(solution)
+            solution_cache[solution_tuple] = cost
+            return cost
 
     # Step 1: k = 0
     k = 0
@@ -44,7 +59,9 @@ def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, eps
     # Step 3: Set best (global) solution s* = s.
     best_solution = current.copy()
 
-    best_cost = cost_fn(best_solution,min_wait)
+    best_cost = cost_fn(best_solution)
+
+    solution_cache[tuple(best_solution)] = best_cost
 
     # Step 4: Initialize the Tabu list T as an empty list.
     tabu_list = []
@@ -52,17 +69,17 @@ def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, eps
     while k < step_limit:
 
         i = 0
-        current_cost = cost_fn(current,min_wait)
+        current_cost = cache_cost(current)
         while i < op_limit:
             # Step 8: Determine the neighborhood N(s) using simple swap moves.
-            neighborhood = get_neighbors_tabu(current)
+            neighborhood = get_neighbors_tabu_slice(current,slice_size=10)
             candidate = None
             candidate_move = None
             candidate_cost = float('inf')
-            current_cost = cost_fn(current,min_wait)
+            current_cost = cache_cost(current)
             # Evaluate each neighbor:
             for move, neighbor in neighborhood:
-                c = cost_fn(neighbor,min_wait)
+                c = cache_cost(neighbor)
                 # If the move is tabu (i.e. present in tabu_list) and does not satisfy aspiration, skip it.
                 if move in tabu_list and c >= current_cost - epsilon:
                     continue
@@ -110,12 +127,12 @@ def tabu_search(start_station,stations_string,start_time,mode="TIME"):
 
     best_solution, best_cost = tabu_search_alg(
         init_solution=init_solution,
-        cost_fn=cost_fn,
+        cost_fn= lambda candidate_solution: cost_fn(candidate_solution,120),
         step_limit=100,
-        op_limit= 50,
-        tabu_size=15,
-        epsilon=0.1,
-        min_wait=120
+        op_limit= 30,
+        tabu_size=10*n,
+        epsilon=120,
+
 
     )
 
@@ -182,8 +199,8 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
     for i in range(len(route_order) - 1):
         s = route_order[i]
         t = route_order[i + 1]
-        key = (s, t, current_time,id(end_node) if end_node is not None else None)
-        print(f"\nLeg {i + 1}: {s} -> {t}")
+        key = (s, t, current_time,end_node)
+        print(f"\nLeg {i + 1}: {s} -> {t} start_time: {current_time}")
         #print(key)
         if key in route_cache:
             end_node = route_cache[key]
@@ -201,6 +218,11 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
             current_time = next_departure_time
         else:
             print("  [No cached route found for this leg]")
+
+            for key in keys:
+                station,_,_,_ = key
+                if( end_node and station==end_node.station_name):
+                    print(key)
     print(f"\nTotal route cost: {total_cost} s (~{total_cost / 60:.1f} min)")
 
 

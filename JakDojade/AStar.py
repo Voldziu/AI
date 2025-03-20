@@ -113,7 +113,7 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
 
 
 def a_star_cached(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait,start_node=None):
-    key = (start_station, end_station, start_time,id(start_node) if start_node is not None else None)
+    key = (start_station, end_station, start_time,start_node)
     if key in route_cache:
         print("Cache hit")
         node = route_cache[key]
