@@ -84,7 +84,7 @@ def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, eps
                 if move in tabu_list and c >= current_cost - epsilon:
                     continue
                 if c < candidate_cost:
-                    candidate = neighbor
+                    candidate = neighbor.copy()
                     candidate_move = move
                     candidate_cost = c
 
@@ -94,7 +94,7 @@ def tabu_search_alg(init_solution, cost_fn, step_limit, op_limit, tabu_size, eps
                 tabu_list.pop(0)
             # Step 11: If candidate improves current solution, update current.
             if candidate_cost < current_cost:
-                current = candidate
+                current = candidate.copy()
 
             i += 1
             k += 1
@@ -142,8 +142,12 @@ def tabu_search(start_station,stations_string,start_time,mode="TIME"):
 
 
 def costAStar(route_cache,adjacency,start_time,start_station,station_names,station_coords,candidate_solution:[int],transfer_penalty,min_wait):
+    sorted_station_names = []
+    for idx in candidate_solution:
+        sorted_station_names.append(station_names[idx]) #in between station names (no start-end station)
 
-    station_names = [station_name for _,station_name in sorted(zip(candidate_solution,station_names))] #in between station names (no start-end station)
+    station_names = sorted_station_names
+
     cost =0
     num_of_inbetween_stations = len( station_names)
 
@@ -219,10 +223,10 @@ def decode_and_print_solution(route_cache, start_station, stations_string, solut
         else:
             print("  [No cached route found for this leg]")
 
-            for key in keys:
-                station,_,_,_ = key
-                if( end_node and station==end_node.station_name):
-                    print(key)
+        # for key in keys:
+        #     station,_,_,_ = key
+        #     if( end_node and station==end_node.station_name):
+        #         print(key)
     print(f"\nTotal route cost: {total_cost} s (~{total_cost / 60:.1f} min)")
 
 
@@ -243,7 +247,7 @@ if __name__=="__main__":
     #stations_string = "most Grunwaldzki;Kochanowskiego;Wiśniowa;PL. JANA PAWŁA II"
     #stations_string = "GRABISZYŃSKA (Cmentarz);ZOO;Urząd Wojewódzki (Muzeum Narodowe);most Grunwaldzki;Kochanowskiego;Wiśniowa;PL. JANA PAWŁA II"
     #stations_string = "GRABISZYŃSKA (Cmentarz);Fiołkowa;FAT;Hutmen;Bzowa (Centrum Historii Zajezdnia)"
-    stations_string = "Kliniki - Politechnika Wrocławska;BISKUPIN;Stalowa;Krucza;rondo Św. Ojca Pio"
+    stations_string = "Kliniki - Politechnika Wrocławska;BISKUPIN;Stalowa;Krucza;rondo Św. Ojca Pio;most Grunwaldzki;SĘPOLNO"
 
     best_solution, best_cost,route_cache = tabu_search(start_station,stations_string,START_TIME)
 

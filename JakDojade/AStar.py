@@ -1,6 +1,7 @@
 import math
 import pickle
 from funcs import *
+from printing import *
 
 
 # ------------------- Unified A* Algorithm -------------------
@@ -126,6 +127,7 @@ def a_star_cached(route_cache,adjacency, start_station, end_station, start_time,
 
 
 def a_star_cached_print_stats(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty,min_wait,start_node=None):
+
     end_node = a_star_cached(route_cache,adjacency, start_station, end_station, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=start_node)
     #print(f"end_node= {end_node}")
     print_whole_stats(end_node,

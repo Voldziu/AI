@@ -1,8 +1,9 @@
 from funcs import *
 from DataPreprocessing import *
-from AStar import a_star
+from AStar import a_star, a_star_proper
 from Dijkstra import dijkstra
-
+from printing import *
+import time
 csv_file_name = "connection_graph.csv"
 
 
@@ -16,13 +17,22 @@ if __name__ == "__main__":
     START_TIME_STR = "19:00:00"
     START_TIME = parse_time(START_TIME_STR)
 
-    end_node = a_star(adjacency, START_STATION, END_STATION, START_TIME, station_coords, mode="TIME")
+    calc_start_time = time.time()
+
+
+    end_node = a_star_proper(START_STATION, END_STATION, START_TIME,mode="TIME")
 
     print_whole_stats(end_node,
                       start_station=START_STATION,
                       end_station=END_STATION,
-                      start_time_str=START_TIME_STR,
+                      start_time=START_TIME,
                       )
 
+    calc_end_time = time.time()
+
+
+    elapsed = calc_end_time- calc_start_time
+
+    print(f"Calculation time: {elapsed} s")
 
 

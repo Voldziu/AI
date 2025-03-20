@@ -81,242 +81,110 @@ def heuristic(start, station_coords, end):
 
 def build_adjacency(df):
     """
-    Reads CSV data
-    builds adjacency dict = adjacency[start_stop] = list (dep_time, arr_time, line, end_stop)
-    Sorted by dep_time
+    Returns adjacency2: dict of dict,
+      adjacency2[start_stop][(line, end_stop)] = list of (dep_time, arr_time),
+    plus stop_coords.
     """
-    adjacency = defaultdict(list)
-    stop_coords = {}  # Mapping stop -> (latitude, longitude)
+    adjacency = {}
+    stop_coords = {}
 
-
-    for id,row in df.iterrows():
-
+    for _, row in df.iterrows():
         line_name   = row['line']
         dep_time    = row['departure_time']
         arr_time    = row['arrival_time']
         start_stop  = row['start_stop']
         end_stop    = row['end_stop']
 
-        # Save coordinates if not already present
+        # Store coords if not present
         if start_stop not in stop_coords:
             stop_coords[start_stop] = (float(row['start_stop_lat']), float(row['start_stop_lon']))
         if end_stop not in stop_coords:
             stop_coords[end_stop] = (float(row['end_stop_lat']), float(row['end_stop_lon']))
 
-        adjacency[start_stop].append((dep_time, arr_time, line_name, end_stop))
+        # Ensure keys exist:
+        if start_stop not in adjacency:
+            adjacency[start_stop] = {}
 
-    # Posortuj listy wg dep_time
+        key = (line_name, end_stop)
+        if key not in adjacency[start_stop]:
+            adjacency[start_stop][key] = []
+
+        adjacency[start_stop][key].append((dep_time, arr_time))
+
+    # Now sort each sub-list by dep_time
     for st in adjacency:
-        adjacency[st].sort(key=lambda x: x[0])
+        for (line_name, end_stop), times_list in adjacency[st].items():
+            times_list.sort(key=lambda x: x[0])
 
-    return adjacency,stop_coords
+    return adjacency, stop_coords
 
-def get_neighbors(current, adjacency, transfer_penalty,min_wait=120):
+
+
+def get_neighbors(current, adjacency, transfer_penalty, min_wait=120):
     """
-    For each trip (dep_time, arr_time, candidate_line, next_station) from current.station_name:
-      - If current.current_line is None or equals candidate_line (i.e. no transfer):
-            Trip is catchable if candidate.dep_time >= current.arrival_time.
-            edge_cost = (candidate.arr_time - candidate.dep_time).
-            .
-            new_arrival = candidate.arr_time.
-      - Else (transfer):
-            Trip is catchable only if candidate.dep_time >= current.arrival_time + min_wait.
-            edge_cost = (candidate.arr_time - candidate.dep_time) + penalty.
+    current: your current A* node (with fields station_name, current_line, arrival_time, total, etc.).
+    adjacency2: the nested adjacency dict described above.
+    transfer_penalty: penalty time for transferring lines.
+    min_wait: how many seconds of wait are required when transferring lines?
 
-            new_arrival = candidate.arr_time.
-    Returns a list of tuples:
-      (neighbor_station, edge_cost, new_total, new_arrival, edge_info)
-    where edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station).
+    Returns a list of neighbors:
+      [(neighbor_station, edge_cost, new_total, new_arrival, edge_info), ...]
     """
     neighbors = []
+    station = current.station_name
 
-    if current.station_name not in adjacency:
+    if station not in adjacency:
         return neighbors
-    for (dep_time, arr_time, candidate_line, next_station) in adjacency[current.station_name]:
-        if (current.current_line is None or
-                (current.current_line == candidate_line
-                 and
-                 current.parent_station_name != next_station )): # reversing on the same line, we need a transfer.
-            # Same line or first ride
-            if dep_time >= current.arrival_time:
-                edge_cost = arr_time - current.arrival_time
-                new_total = current.total + edge_cost
-                new_arrival = arr_time
-                edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station)
-                neighbors.append((next_station, edge_cost,new_total, new_arrival, edge_info))
+
+    # For each (candidate_line, candidate_next_station) group:
+    for (candidate_line, candidate_next_station), departures_list in adjacency[station].items():
+
+        # Decide if transferring lines
+        if current.current_line is None or (current.current_line == candidate_line):
+            # Same line -> no transfer
+            earliest_catch_time = current.arrival_time
+            penalty = 0
         else:
-            # Transfer: require at least 2 minutes wait
-            if dep_time >= current.arrival_time + min_wait:
-                edge_cost = arr_time - current.arrival_time + transfer_penalty
-                new_total = current.total + edge_cost
-                new_arrival = arr_time
-                edge_info = (candidate_line, dep_time, arr_time, current.station_name, next_station)
-                neighbors.append((next_station, edge_cost,new_total, new_arrival, edge_info))
-    return neighbors
+            # Different line -> transfer
+            earliest_catch_time = current.arrival_time + min_wait
+            penalty = transfer_penalty
 
+        # departures_list is already sorted by dep_time
+        chosen_departure = None
+        for (dep_time, arr_time) in departures_list:
+            if dep_time >= earliest_catch_time:
+                # We can catch this departure. It's the first feasible one, so take it and break.
+                chosen_departure = (dep_time, arr_time)
+                break
 
+        if chosen_departure is not None:
+            dep_time, arr_time = chosen_departure
 
+            edge_cost = (arr_time - current.arrival_time) + penalty
+            new_total = current.total + edge_cost
+            new_arrival = arr_time
+            edge_info = (candidate_line, dep_time, arr_time, station, candidate_next_station)
 
-
-
-
-
-
-
-def reconstruct_path(end_node):
-    """
-    Reconstructs the path from the start to the end Node.
-    Returns a list of edges:
-      Each edge is a tuple: (line, departure_time, from_stop, arrival_time, to_stop)
-    If no path exists, returns an empty list.
-    """
-    path = []
-    current = end_node
-    #print(current)
-    while current.parent is not None:
-        #print(current)
-        path.append(current.edge)
-        current = current.parent
-    path.reverse()
-    return path
-
-
-def group_segments(path):
-    """
-    Given the raw path (each segment is
-       (line, dep_time, start_stop, arr_time, end_stop)),
-    group consecutive segments by the same line.
-
-    Returns a list of grouped segments:
-       (line, group_dep_time, group_arr_time, group_start_station, group_end_station).
-    """
-    if not path:
-        return []
-
-    grouped = []
-    # Start the first group from the first segment
-    current_line = path[0][0]
-    current_dep_time = path[0][1]
-    current_arr_time = path[0][2]
-    current_start_station = path[0][3]
-    current_end_station = path[0][4]
-
-    for i in range(1, len(path)):
-        line, dep_t, arr_t,st_start,  st_end = path[i]
-        if line == current_line:
-            # Continue the same line
-            current_arr_time = arr_t
-            current_end_station = st_end
-        else:
-            # Line changed => close the previous group
-            grouped.append((
-                current_line,
-                current_dep_time,
-                current_arr_time,
-                current_start_station,
-                current_end_station
-            ))
-            # Start a new group
-            current_line = line
-            current_dep_time = dep_t
-            current_start_station = st_start
-            current_arr_time = arr_t
-            current_end_station = st_end
-
-    # Add the last group
-    grouped.append((
-        current_line,
-        current_dep_time,
-        current_arr_time,
-        current_start_station,
-        current_end_station
-    ))
-
-    return grouped
-
-
-
-def print_grouped_schedule(start_time,groups):
-    """
-    Prints each grouped segment (same line), including:
-      - total ride time for that line segment
-      - transfer time before the next line
-    """
-    start_index = 0
-    first_group = groups[start_index]
-    line, dep_time, arr_time, st_start, st_end = first_group
-    if(start_time<dep_time):
-        waiting_time = dep_time-start_time
-        print(
-            f"  Waiting time to catch first line: "
-            f"{waiting_time} s ({waiting_time / 60:.1f} min)"
-        )
-    for i, group in enumerate(groups[start_index:]):
-        line, dep_time,  arr_time,st_start, st_end = group
-        group_ride_time = arr_time - dep_time
-        print(
-            f"Line {line}: from '{st_start}' at {format_time(dep_time)} "
-            f"to '{st_end}' at {format_time(arr_time)}. "
-            f"Ride time: {group_ride_time} s (~{group_ride_time/60:.1f} min)"
-        )
-
-        # If there's a next group => print transfer time
-        if i < len(groups) - 1:
-            next_line, next_dep_time, _, _, _ = groups[i+1]
-            transfer_time = next_dep_time - arr_time
-            print(
-                f"  Transfer time before catching line {next_line}: "
-                f"{transfer_time} s ({transfer_time/60:.1f} min)"
+            neighbors.append(
+                (candidate_next_station, edge_cost, new_total, new_arrival, edge_info)
             )
 
+    return neighbors
+
+# def prepare_n_stations_for_search(adjacency,n):
+#     station_names = list(adjacency.keys())
+#     return_string =""
+#     if(n<3):
+#         return return_string
+#     chosen_stations =  random.sample(station_names,n)
+#
+#     for name in chosen_stations[1:-1]:
+#         return_string+=(name+";")
+#     return_string+=chosen_stations[-1]
+#
+#     return chosen_stations[0],return_string
 
 
-
-def prepare_n_stations_for_search(adjacency,n):
-    station_names = list(adjacency.keys())
-    return_string =""
-    if(n<3):
-        return return_string
-    chosen_stations =  random.sample(station_names,n)
-
-    for name in chosen_stations[1:-1]:
-        return_string+=(name+";")
-    return_string+=chosen_stations[-1]
-
-    return chosen_stations[0],return_string
-
-
-
-
-def print_whole_stats(end_node,start_station,end_station,start_time):
-    start_time_str = format_time(start_time)
-
-
-    if end_node is None:
-        print("There's no connection between those stations.")
-        sys.exit(1)
-
-    path = reconstruct_path(end_node)
-    if not path:
-        print("No connection (parent invalid)")
-        sys.exit(1)
-
-    # Group consecutive segments by line
-    grouped_path = group_segments(path)
-
-    print(f"\t\t=== Route from {start_station} to {end_station}  ===\n")
-    print(f"Start time: {start_time_str}")
-    print_grouped_schedule(start_time, grouped_path)
-
-    # Print total travel time
-    total_travel_time = end_node.arrival_time - start_time
-    # print("\n=== Final cost ===", file=sys.stderr)
-    # print(f"\n=== {end_node.total} ===", file=sys.stderr)
-    # print(
-    #     f"Final travel time: {total_travel_time} s "
-    #     f"(~{total_travel_time / 60:.1f} min)",
-    #     file=sys.stderr
-    # )
 
 
 
