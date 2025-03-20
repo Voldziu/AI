@@ -19,8 +19,8 @@ if __name__ == "__main__":
 
     calc_start_time = time.time()
 
-
-    end_node = a_star_proper(START_STATION, END_STATION, START_TIME,mode="TIME")
+    end_node = dijkstra(adjacency,START_STATION, END_STATION, START_TIME)
+    #end_node = a_star_proper(START_STATION, END_STATION, START_TIME,mode="TIME")
 
     print_whole_stats(end_node,
                       start_station=START_STATION,
