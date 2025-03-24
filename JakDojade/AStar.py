@@ -49,10 +49,13 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
     open_list = [start_node]
     closed_list = []
 
+    nodes =0
+    edges =0
+
     while open_list:
         current = min(open_list, key=lambda node: node.f)
         if current.station_name == end_station:
-            return current  # Goal reached
+            return nodes,edges,current  # Goal reached
 
         open_list.remove(current)
         closed_list.append(current)
@@ -106,7 +109,9 @@ def a_star(adjacency, start_station, end_station, start_time, station_coords,tra
                     if neighbor_in_closed is not None:
                         closed_list.remove(existing)
                         open_list.append(existing)
-    return None
+            edges+=1
+        nodes+=1
+    return nodes,edges,None
 
 
 
@@ -119,7 +124,7 @@ def a_star_cached(route_cache,adjacency, start_station, end_station, start_time,
         print("Cache hit")
         node = route_cache[key]
         return node
-    end_node = a_star(adjacency, start_station, end_station, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=start_node)
+    _,_,end_node = a_star(adjacency, start_station, end_station, start_time, station_coords,transfer_penalty=transfer_penalty,min_wait=min_wait,start_node=start_node)
     route_cache[key] = end_node
     return end_node
 

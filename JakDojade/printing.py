@@ -128,10 +128,10 @@ def print_whole_stats(end_node,start_station,end_station,start_time):
 
     # Print total travel time
     total_travel_time = end_node.arrival_time - start_time
-    # print("\n=== Final cost ===", file=sys.stderr)
-    # print(f"\n=== {end_node.total} ===", file=sys.stderr)
-    # print(
-    #     f"Final travel time: {total_travel_time} s "
-    #     f"(~{total_travel_time / 60:.1f} min)",
-    #     file=sys.stderr
-    # )
+    print("\n=== Final cost ===", file=sys.stderr)
+    print(f"\n=== {end_node.total} ===", file=sys.stderr)
+    print(
+        f"Final travel time: {total_travel_time} s "
+        f"(~{total_travel_time / 60:.1f} min)",
+        file=sys.stderr
+    )

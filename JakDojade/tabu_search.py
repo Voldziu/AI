@@ -234,13 +234,12 @@ if __name__=="__main__":
     with open("graph.pickle", "rb") as f:
         adjacency, station_coords = pickle.load(f)
 
-    START_TIME_STR = "17:40:00"
+    START_TIME_STR = "06:40:00"
     START_TIME = parse_time(START_TIME_STR)
     mode = 'TIME'
 
-    N = 4 #Number stations to visit
 
-    #start_station,stations_string = prepare_n_stations_for_search(adjacency,N)
+
 
     #start_station = "Stalowa"
     start_station= "KRZYKI"
@@ -248,8 +247,13 @@ if __name__=="__main__":
     #stations_string = "GRABISZYŃSKA (Cmentarz);ZOO;Urząd Wojewódzki (Muzeum Narodowe);most Grunwaldzki;Kochanowskiego;Wiśniowa;PL. JANA PAWŁA II"
     #stations_string = "GRABISZYŃSKA (Cmentarz);Fiołkowa;FAT;Hutmen;Bzowa (Centrum Historii Zajezdnia)"
     stations_string = "Kliniki - Politechnika Wrocławska;BISKUPIN;Stalowa;Krucza;rondo Św. Ojca Pio;most Grunwaldzki;SĘPOLNO"
+    #stations_string = "Tarczyński Arena (Lotnicza);Niedźwiedzia;Bujwida;PARK POŁUDNIOWY;Na Niskich Łąkach;BISKUPIN"
 
-    best_solution, best_cost,route_cache = tabu_search(start_station,stations_string,START_TIME)
+    #N = 10
+    #start_station, stations_string = prepare_n_stations_for_search(adjacency,N)
+
+
+    best_solution, best_cost,route_cache = tabu_search(start_station,stations_string,START_TIME,mode="TIME")
 
     decode_and_print_solution(
                                 route_cache=route_cache,
@@ -262,7 +266,8 @@ if __name__=="__main__":
 
                               )
 
-
+    print(start_station)
+    print(stations_string)
     print(best_solution)
     print(best_cost)
 

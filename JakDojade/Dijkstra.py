@@ -20,12 +20,7 @@ def dijkstra(
     It uses station+line+parent to keep states distinct.
     """
 
-    # A Node class is assumed to look roughly like:
-    # Node(station_name, g, total, h=0, f=0, parent=None, edge=None,
-    #      arrival_time=0, current_line=None, parent_station_name=None)
-    #
-    # For best parity with A*, define:
-    #    node.parent_station_name = node.parent.station_name  (if parent is not None)
+
 
     start_node = Node(
         station_name=start_station,
@@ -37,33 +32,29 @@ def dijkstra(
         arrival_time=start_time,
         current_line=None
     )
-    # In some scenarios, you might want start_node.parent_station_name
-    # to be None or "" because there's no parent.
 
-    # Priority queue of (total_cost, Node). We'll pop the cheapest total cost first.
     open_heap = []
     heapq.heappush(open_heap, (start_node.total, start_node))
 
-    # best_map is keyed by (station_name, current_line, parent_station_name).
-    # This way, different ways of arriving at the same station are tracked separately.
+
     best_map = {}
     key = (start_node.station_name, start_node.current_line, "")
     best_map[key] = start_node
-
+    nodes =0
+    edges =0
     while open_heap:
         _, current = heapq.heappop(open_heap)
 
-        # If we've reached the goal station, we can return immediately.
-        if current.station_name == end_station:
-            return current
 
-        # Optional skip: If a better cost for this exact triple was found.
+        if current.station_name == end_station:
+            return nodes,edges,current
+
+
         ckey = (current.station_name, current.current_line, current.parent_station_name)
         if current.total > best_map[ckey].total:
             continue
 
-        # Expand neighbors with the same logic used by A*,
-        # i.e., pass transfer_penalty and min_wait.
+
         neighbors = get_neighbors(
             current,
             adjacency,
@@ -71,9 +62,9 @@ def dijkstra(
             min_wait=min_wait
         )
         for (nbr_station, edge_cost, new_total, new_arrival, edge_info) in neighbors:
-            # 'edge_info' might look like: (line, dep_time, arr_time, parent_station_name)
+
             candidate_line = edge_info[0]
-            candidate_parent_station_name = edge_info[3]  # or however you store it
+            candidate_parent_station_name = edge_info[3]
 
             # Build a new node for the neighbor
             neighbor_node = Node(
@@ -108,6 +99,8 @@ def dijkstra(
                 best_map[nkey] = neighbor_node
                 heapq.heappush(open_heap, (neighbor_node.total, neighbor_node))
 
-    # If we exhaust the queue without reaching `end_station`, there's no route.
-    return None
+            edges+=1
+
+        nodes+=1
+    return nodes,edges,None
 

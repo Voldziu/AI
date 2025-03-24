@@ -171,18 +171,18 @@ def get_neighbors(current, adjacency, transfer_penalty, min_wait=120):
 
     return neighbors
 
-# def prepare_n_stations_for_search(adjacency,n):
-#     station_names = list(adjacency.keys())
-#     return_string =""
-#     if(n<3):
-#         return return_string
-#     chosen_stations =  random.sample(station_names,n)
-#
-#     for name in chosen_stations[1:-1]:
-#         return_string+=(name+";")
-#     return_string+=chosen_stations[-1]
-#
-#     return chosen_stations[0],return_string
+def prepare_n_stations_for_search(adjacency,n):
+    station_names = list(adjacency.keys())
+    return_string =""
+    if(n<3):
+        return return_string
+    chosen_stations =  random.sample(station_names,n)
+
+    for name in chosen_stations[1:-1]:
+        return_string+=(name+";")
+    return_string+=chosen_stations[-1]
+
+    return chosen_stations[0],return_string
 
 
 
