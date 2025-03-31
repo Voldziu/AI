@@ -10,17 +10,17 @@ csv_file_name = "connection_graph.csv"
 if __name__ == "__main__":
     with open("graph.pickle", "rb") as f:
         adjacency, station_coords = pickle.load(f)
-    START_STATION = 'Wilczyce - Borowa'
-    END_STATION = 'Rynek'
+    START_STATION = "Dobroszów - skrzy. Węgierska"
+    END_STATION = "Miodowa"
     # START_STATION = 'Stalowa'
     # END_STATION = 'pl. Legionów'
-    START_TIME_STR = "23:20:00"
+    START_TIME_STR = "17:12:00"
     START_TIME = parse_time(START_TIME_STR)
 
     calc_start_time = time.time()
 
-    nodes,edges,end_node = dijkstra(adjacency,START_STATION, END_STATION, START_TIME)
-    #nodes,edges,end_node = a_star_proper(START_STATION, END_STATION, START_TIME,mode="TRANSFERS")
+    #nodes,edges,end_node = dijkstra(adjacency,START_STATION, END_STATION, START_TIME)
+    nodes,edges,end_node = a_star_proper(START_STATION, END_STATION, START_TIME,mode="TRANSFERS")
 
 
     print_whole_stats(end_node,
