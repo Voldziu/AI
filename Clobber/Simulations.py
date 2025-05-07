@@ -11,12 +11,12 @@ import os
 
 
 class Simulation:
-    def __init__(self, board_size=(5, 6), max_depth=3, use_alpha_beta=True, num_games=10):
+    def __init__(self, board_size=(5, 6), max_depth=3, use_alpha_beta=True):
 
         self.board_size = board_size
         self.max_depth = max_depth
         self.use_alpha_beta = use_alpha_beta
-        self.num_games = num_games
+
 
         # Define all available heuristics
         self.heuristics = {
@@ -49,7 +49,7 @@ class Simulation:
                 use_alpha_beta=self.use_alpha_beta
             )
 
-    def play_games(self, black_heuristic, white_heuristic, num_games):
+    def play_games(self, black_heuristic, white_heuristic):
         """
         Play multiple games between two heuristics.
 
@@ -61,23 +61,23 @@ class Simulation:
         Returns:
             list: Results of all games
         """
-        results = []
-        for _ in range(num_games):
-            # Create agents
-            black_agent = self.create_agent('B', black_heuristic)
-            white_agent = self.create_agent('W', white_heuristic)
 
-            # Use the play_game function from ClobberGame
-            _, result = play_game(
-                agent1=black_agent,
-                agent2=white_agent,
-                size=self.board_size,
-                max_rounds=100,  # Safety limit
-                silent=True  # Suppress output for simulations
-            )
 
-            results.append(result)
-        return results
+        # Create agents
+        black_agent = self.create_agent('B', black_heuristic)
+        white_agent = self.create_agent('W', white_heuristic)
+
+        # Use the play_game function from ClobberGame
+        _, result = play_game(
+            agent1=black_agent,
+            agent2=white_agent,
+            size=self.board_size,
+            max_rounds=100,  # Safety limit
+            silent=True)  # Suppress output for simulations
+
+
+
+        return result
 
     def run_simulations(self, num_threads=None, gpu=False):
         """
@@ -98,7 +98,7 @@ class Simulation:
 
         # Progress display
         total_matchups = len(matchups)
-        total_games = total_matchups * self.num_games
+        total_games = total_matchups
         print(f"Running {total_games} games across {total_matchups} matchups...")
 
         # Use ThreadPoolExecutor for parallel processing
@@ -108,7 +108,7 @@ class Simulation:
 
             # Submit all tasks
             for black_h, white_h in matchups:
-                future = executor.submit(self.play_games, black_h, white_h, self.num_games)
+                future = executor.submit(self.play_games, black_h, white_h)
                 future_to_matchup[future] = (black_h, white_h)
 
             # Process completed tasks with a progress bar
@@ -116,8 +116,8 @@ class Simulation:
                 for future in concurrent.futures.as_completed(future_to_matchup):
                     matchup = future_to_matchup[future]
                     try:
-                        results = future.result()
-                        self.results[matchup] = results
+                        result = future.result()
+                        self.results[matchup] = result
                     except Exception as exc:
                         print(f"{matchup} generated an exception: {exc}")
                     pbar.update(1)
@@ -127,29 +127,25 @@ class Simulation:
 
     def calculate_performance_metrics(self):
         """Calculate performance metrics for all matchups."""
-        for matchup, games in self.results.items():
+        for matchup, game in self.results.items():
             black_h, white_h = matchup
-            black_wins = sum(1 for game in games if game["winner"] == "B")
-            white_wins = sum(1 for game in games if game["winner"] == "W")
-            avg_rounds = sum(game["rounds"] for game in games) / len(games)
-            avg_nodes_black = sum(game["nodes_black"] for game in games) / len(games)
-            avg_nodes_white = sum(game["nodes_white"] for game in games) / len(games)
-            avg_time_black = sum(game["time_black"] for game in games) / len(games)
-            avg_time_white = sum(game["time_white"] for game in games) / len(games)
+            black_won = 1 if game["winner"] == "B" else 0
+            rounds = game["rounds"]
+            nodes_black = game["nodes_black"]
+            nodes_white = game["nodes_white"]
+            time_black = game["time_black"]
+            time_white = game["time_white"]
 
             self.performance_metrics[matchup] = {
-                "black_wins": black_wins,
-                "white_wins": white_wins,
-                "win_rate_black": black_wins / len(games),
-                "win_rate_white": white_wins / len(games),
-                "avg_rounds": avg_rounds,
-                "avg_nodes_black": avg_nodes_black,
-                "avg_nodes_white": avg_nodes_white,
-                "avg_time_black": avg_time_black,
-                "avg_time_white": avg_time_white
+                "black_won": black_won,
+                "rounds": rounds,
+                "nodes_black": nodes_black,
+                "nodes_white": nodes_white,
+                "time_black": time_black,
+                "time_white": time_white
             }
 
-    def generate_report(self, output_dir="simulation_results"):
+    def generate_report(self ,output_dir="simulation_results"):
         """
         Generate detailed report of simulation results.
 
@@ -162,36 +158,40 @@ class Simulation:
 
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
+        final_dir = f"{output_dir}/max_depth_{self.max_depth}/alpha_beta_{self.use_alpha_beta}"
+        os.makedirs(final_dir, exist_ok=True)
+
+
 
         # Prepare data for win rate heatmap
         heuristic_names = list(self.heuristics.keys())
-        win_rate_matrix = np.zeros((len(heuristic_names), len(heuristic_names)))
+        win_black_matrix = np.zeros((len(heuristic_names), len(heuristic_names)))
 
         for i, black_h in enumerate(heuristic_names):
             for j, white_h in enumerate(heuristic_names):
                 matchup = (black_h, white_h)
                 if matchup in self.performance_metrics:
-                    win_rate_matrix[i, j] = self.performance_metrics[matchup]["win_rate_black"]
+                    win_black_matrix[i, j] = self.performance_metrics[matchup]["black_won"]
 
         # Create win rate heatmap
         plt.figure(figsize=(12, 10))
-        plt.imshow(win_rate_matrix, cmap='RdYlGn', vmin=0, vmax=1)
+        plt.imshow(win_black_matrix, cmap='RdYlGn', vmin=0, vmax=1)
         plt.colorbar(label='Black Win Rate')
         plt.xticks(np.arange(len(heuristic_names)), heuristic_names, rotation=45)
         plt.yticks(np.arange(len(heuristic_names)), heuristic_names)
         plt.xlabel('White Heuristic')
         plt.ylabel('Black Heuristic')
-        plt.title('Black Win Rate by Heuristic Matchup')
+        plt.title('Black Wins by Heuristic Matchup')
 
         # Add text annotations
         for i in range(len(heuristic_names)):
             for j in range(len(heuristic_names)):
-                text = f"{win_rate_matrix[i, j]:.2f}"
+                text = f"{win_black_matrix[i, j]:.2f}"
                 plt.text(j, i, text, ha="center", va="center",
-                         color="black" if 0.25 < win_rate_matrix[i, j] < 0.75 else "white")
+                         color="black" if 0.25 < win_black_matrix[i, j] < 0.75 else "white")
 
         plt.tight_layout()
-        plt.savefig(f"{output_dir}/win_rate_heatmap.png")
+        plt.savefig(f"{final_dir}/win_rate_heatmap.png")
 
         # Create CSV report
         report_data = []
@@ -200,82 +200,161 @@ class Simulation:
             row = {
                 "Black_Heuristic": black_h,
                 "White_Heuristic": white_h,
-                "Black_Wins": metrics["black_wins"],
-                "White_Wins": metrics["white_wins"],
-                "Black_Win_Rate": metrics["win_rate_black"],
-                "White_Win_Rate": metrics["win_rate_white"],
-                "Avg_Rounds": metrics["avg_rounds"],
-                "Avg_Nodes_Black": metrics["avg_nodes_black"],
-                "Avg_Nodes_White": metrics["avg_nodes_white"],
-                "Avg_Time_Black": metrics["avg_time_black"],
-                "Avg_Time_White": metrics["avg_time_white"]
+                "Black Won": metrics["black_won"],
+                "Rounds": metrics["rounds"],
+                "Nodes_Black": metrics["nodes_black"],
+                "Nodes_White": metrics["nodes_white"],
+                "Time_Black": metrics["time_black"],
+                "Time_White": metrics["time_white"]
             }
             report_data.append(row)
 
         df = pd.DataFrame(report_data)
-        df.to_csv(f"{output_dir}/simulation_results.csv", index=False)
+        df.to_csv(f"{final_dir}/simulation_results.csv", index=False)
 
-        # Generate summary statistics
-        best_black = df.loc[df['Black_Win_Rate'].idxmax()]
-        best_white = df.loc[df['White_Win_Rate'].idxmax()]
-        most_efficient_black = df.loc[df[df['Black_Win_Rate'] > 0.5]['Avg_Nodes_Black'].idxmin()]
-        most_efficient_white = df.loc[df[df['White_Win_Rate'] > 0.5]['Avg_Nodes_White'].idxmin()]
+        # Calculate strategy performance metrics
+        # For Black player
+        black_wins_by_strategy = {}
+        for h in heuristic_names:
+            wins = 0
+            games = 0
+            for white_h in heuristic_names:
+                matchup = (h, white_h)
+                if matchup in self.performance_metrics:
+                    wins += self.performance_metrics[matchup]["black_won"]
+                    games += 1
+            if games > 0:
+                black_wins_by_strategy[h] = wins / games
 
-        with open(f"{output_dir}/summary.txt", 'w') as f:
+        # For White player
+        white_wins_by_strategy = {}
+        for h in heuristic_names:
+            wins = 0
+            games = 0
+            for black_h in heuristic_names:
+                matchup = (black_h, h)
+                if matchup in self.performance_metrics:
+                    # White wins when Black loses
+                    wins += (1 - self.performance_metrics[matchup]["black_won"])
+                    games += 1
+            if games > 0:
+                white_wins_by_strategy[h] = wins / games
+
+        # Add overall best strategy recommendation
+        overall_wins = {}
+
+        #Calculate overall nodes and time
+        all_nodes = 0
+        all_time = 0
+        for h in heuristic_names:
+            overall_wins[h] = (black_wins_by_strategy.get(h, 0) + white_wins_by_strategy.get(h, 0)) / 2
+
+        # Find best and worst strategies
+        best_black = max(black_wins_by_strategy.items(), key=lambda x: x[1])
+        worst_black = min(black_wins_by_strategy.items(), key=lambda x: x[1])
+        best_white = max(white_wins_by_strategy.items(), key=lambda x: x[1])
+        worst_white = min(white_wins_by_strategy.items(), key=lambda x: x[1])
+        best_overall = max(overall_wins.items(), key=lambda x: x[1])
+        worst_overall = min(overall_wins.items(), key=lambda x: x[1])
+        # Add efficiency metrics (nodes per second)
+        efficiency_by_strategy = {}
+        for h in heuristic_names:
+            black_nodes = 0
+            black_time = 0
+            white_nodes = 0
+            white_time = 0
+            games_as_black = 0
+            games_as_white = 0
+
+            # When playing as Black
+            for white_h in heuristic_names:
+                matchup = (h, white_h)
+                if matchup in self.performance_metrics:
+                    black_nodes += self.performance_metrics[matchup]["nodes_black"]
+                    black_time += self.performance_metrics[matchup]["time_black"]
+                    games_as_black += 1
+
+            # When playing as White
+            for black_h in heuristic_names:
+                matchup = (black_h, h)
+                if matchup in self.performance_metrics:
+                    white_nodes += self.performance_metrics[matchup]["nodes_white"]
+                    white_time += self.performance_metrics[matchup]["time_white"]
+                    games_as_white += 1
+
+            # Calculate efficiency (avoid division by zero)
+            black_efficiency = black_nodes / black_time if black_time > 0 and games_as_black > 0 else 0
+            white_efficiency = white_nodes / white_time if white_time > 0 and games_as_white > 0 else 0
+
+            # Calculate all nodes and time
+            all_nodes_h = black_nodes + white_nodes
+            all_nodes +=all_nodes_h
+
+            all_time_h = black_time + white_time
+            all_time +=all_time_h
+
+
+
+
+
+
+
+
+
+            # Average efficiency across both colors
+            efficiency_by_strategy[h] = (
+                                                    black_efficiency + white_efficiency) / 2 if games_as_black > 0 and games_as_white > 0 else 0
+
+        most_efficient = max(efficiency_by_strategy.items(), key=lambda x: x[1])
+        least_efficient = min(efficiency_by_strategy.items(), key=lambda x: x[1])
+
+        # Calculate average nodes and time
+        avg_nodes = all_nodes / len(self.performance_metrics)
+        avg_time = all_time / len(self.performance_metrics)
+
+        # Write summary file with strategy analysis
+        with open(f"{final_dir}/summary.txt", 'w') as f:
             f.write("CLOBBER SIMULATION SUMMARY\n")
             f.write("=========================\n\n")
             f.write(f"Board Size: {self.board_size[0]}x{self.board_size[1]}\n")
             f.write(f"Max Depth: {self.max_depth}\n")
             f.write(f"Alpha-Beta Pruning: {'Enabled' if self.use_alpha_beta else 'Disabled'}\n")
-            f.write(f"Games per Matchup: {self.num_games}\n\n")
+            f.write(f"Nodes visited:{all_nodes}\n")
+            f.write(f"Time elapsed:{all_time}\n")
+            f.write(f" Average Nodes visited:{avg_nodes}\n")
+            f.write(f"Average Time elapsed:{avg_time}\n")
 
-            f.write("BEST PERFORMING HEURISTICS\n")
-            f.write("-------------------------\n")
-            f.write(f"Best Black Heuristic: {best_black['Black_Heuristic']} ")
-            f.write(f"(Win Rate: {best_black['Black_Win_Rate']:.2f}) ")
-            f.write(f"against {best_black['White_Heuristic']}\n")
+            f.write("STRATEGY ANALYSIS\n")
+            f.write("=================\n\n")
 
-            f.write(f"Best White Heuristic: {best_white['White_Heuristic']} ")
-            f.write(f"(Win Rate: {best_white['White_Win_Rate']:.2f}) ")
-            f.write(f"against {best_white['Black_Heuristic']}\n\n")
+            f.write("Best Strategies:\n")
+            f.write(f"- Best for Black: {best_black[0]} (Win rate: {best_black[1]:.2f})\n")
+            f.write(f"- Best for White: {best_white[0]} (Win rate: {best_white[1]:.2f})\n\n")
+            f.write(f"- Overall: {best_overall[0]} (Win rate: {best_overall[1]:.2f})\n\n")
 
-            f.write("MOST EFFICIENT HEURISTICS (winning with minimal node exploration)\n")
-            f.write("------------------------------------------------------------\n")
-            f.write(f"Most Efficient Black: {most_efficient_black['Black_Heuristic']} ")
-            f.write(f"(Avg Nodes: {most_efficient_black['Avg_Nodes_Black']:.0f}, ")
-            f.write(f"Win Rate: {most_efficient_black['Black_Win_Rate']:.2f})\n")
+            f.write("Worst Strategies:\n")
+            f.write(f"- Worst for Black: {worst_black[0]} (Win rate: {worst_black[1]:.2f})\n")
+            f.write(f"- Worst for White: {worst_white[0]} (Win rate: {worst_white[1]:.2f})\n\n")
+            f.write(f"- Overall: {worst_overall[0]} (Win rate: {worst_overall[1]:.2f})\n\n")
 
-            f.write(f"Most Efficient White: {most_efficient_white['White_Heuristic']} ")
-            f.write(f"(Avg Nodes: {most_efficient_white['Avg_Nodes_White']:.0f}, ")
-            f.write(f"Win Rate: {most_efficient_white['White_Win_Rate']:.2f})\n\n")
+            f.write("Computational Efficiency:\n")
+            f.write(f"- Most Efficient: {most_efficient[0]} ({most_efficient[1]:.2f} nodes/second)\n")
+            f.write(f"- Least Efficient: {least_efficient[0]} ({least_efficient[1]:.2f} nodes/second)\n\n")
 
-            # Calculate overall heuristic performance
-            f.write("OVERALL HEURISTIC PERFORMANCE\n")
-            f.write("----------------------------\n")
 
-            # Aggregate performance for each heuristic as black and white
-            overall_stats = {}
+
+
+            # Add overall best strategy recommendation
+            overall_wins = {}
             for h in heuristic_names:
-                black_games = df[df['Black_Heuristic'] == h]
-                white_games = df[df['White_Heuristic'] == h]
+                overall_wins[h] = (black_wins_by_strategy.get(h, 0) + white_wins_by_strategy.get(h, 0)) / 2
 
-                overall_stats[h] = {
-                    'black_win_rate': black_games['Black_Win_Rate'].mean(),
-                    'white_win_rate': white_games['White_Win_Rate'].mean(),
-                    'overall_win_rate': (black_games['Black_Win_Rate'].sum() +
-                                         white_games['White_Win_Rate'].sum()) / (len(black_games) + len(white_games))
-                }
+            best_overall = max(overall_wins.items(), key=lambda x: x[1])
+            f.write("OVERALL RECOMMENDATION:\n")
+            f.write(
+                f"The best overall strategy is {best_overall[0]} with an average win rate of {best_overall[1]:.2f}\n")
 
-            # Sort by overall win rate
-            sorted_stats = sorted(overall_stats.items(), key=lambda x: x[1]['overall_win_rate'], reverse=True)
-
-            for heuristic, stats in sorted_stats:
-                f.write(f"{heuristic}:\n")
-                f.write(f"  As Black: {stats['black_win_rate']:.2f} win rate\n")
-                f.write(f"  As White: {stats['white_win_rate']:.2f} win rate\n")
-                f.write(f"  Overall:  {stats['overall_win_rate']:.2f} win rate\n\n")
-
-        print(f"Report generated in {output_dir}/ directory")
+        print(f"Report generated in {final_dir}/ directory")
 
 
 if __name__ == "__main__":
@@ -297,8 +376,7 @@ if __name__ == "__main__":
     print("\nUse alpha-beta pruning? (y/n):")
     use_alpha_beta = input().lower() != 'n'
 
-    print("\nNumber of games per matchup:")
-    num_games = int(input() or "10")
+
 
     print("\nNumber of threads (leave empty for auto):")
     try:
@@ -315,7 +393,6 @@ if __name__ == "__main__":
         board_size=board_size,
         max_depth=max_depth,
         use_alpha_beta=use_alpha_beta,
-        num_games=num_games
     )
 
     simulator.run_simulations(num_threads=num_threads, gpu=use_gpu)
